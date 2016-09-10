@@ -1,0 +1,12 @@
+# depslib dependency file v1.0
+1473499828 source:/home/u32x/akos/gamelife/main.cpp
+	<iostream>
+	<cstdio>
+	<vector>
+	<cstdlib>
+	<pthread.h>
+	<stdarg.h>
+	<sys/types.h>
+	<sys/ipc.h>
+	<sys/sem.h>
+
