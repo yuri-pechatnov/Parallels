@@ -10,7 +10,27 @@
 
 using namespace std;
 
+typedef long long int int64;
 
+class TimeCounter {
+  private:
+    int64 t;
+    int64 time() {
+        unsigned int tickl, tickh;
+        __asm__ __volatile__("rdtsc":"=a"(tickl),"=d"(tickh));
+        return ((unsigned long long)tickh << 32)|tickl;
+    }
+  public:
+    void start() {
+        t = time();
+    }
+    int64 durationTicks() {
+        return time() - t;
+    }
+    TimeCounter() {
+        start();
+    }
+};
 
 
 int eprintf(const char *format, ...) {
@@ -28,7 +48,7 @@ class Field {
     char &at(int i, int j) {
         i = (i + W) % W;
         j = (j + H) % H;
-        return matrix[i * H + j];
+        return matrix[i * H + j];//j * W + i];//
     }
     char getNext(int i, int j) {
         int sum = 0;
@@ -48,132 +68,162 @@ class Field {
         return sum;
     }
     Field(int W, int H): W(W), H(H), matrix(W * H) {}
+    Field(): W(0), H(0) {}
 };
 
 
 
 
-struct TaskData {
-    Field *now, *next;
-    int beginX, endX;
+
+class CommonData {
+  public:
     int semKey;
-    pthread_mutex_t *ss_mutex;
-    pthread_cond_t *ss_cv;
-    int *step;
+    pthread_mutex_t ss_mutex;
+    pthread_cond_t ss_cv;
+    vector <Field> layers;
+    //Field now, next;
+    int step;
     int moves;
-};
 
-
-
-void* calculatePart(void* tData_) {
-    TaskData *tData = (TaskData*)tData_;
-    Field &now = *tData->now, &next = *tData->next;
-    int semid;
-    if ((semid = semget(tData->semKey, 1, 0666)) < 0) {
-        eprintf("Problem with creating semaphore from thread");
-        exit(-7);
-    }
-
-    for (int step = 0; step < tData->moves; step++) {
-        pthread_mutex_lock(tData->ss_mutex);
-        while (step != *tData->step) {
-            pthread_cond_wait(tData->ss_cv, tData->ss_mutex);
+    int getSemId() {
+        int semId;
+        if ((semId = semget(semKey, 1, 0666)) < 0) {
+            eprintf("Problem with creating semaphore from thread");
+            exit(-7);
         }
-        pthread_mutex_unlock(tData->ss_mutex);
-
-        for (int i = tData->beginX; i < tData->endX; i++)
-            for (int j = 0; j < now.H; j++)
-                next.at(i, j) = now.getNext(i, j);
-
+        return semId;
+    }
+    void semAdd(int semid, int val) {
         struct sembuf op;
         op.sem_num = 0;
-        op.sem_op = +1;
+        op.sem_op = val;
         op.sem_flg = 0;
         if (semop(semid, &op, 1) != 0) {
             eprintf("Problem with semaphore adding");
             exit(-7);
         }
     }
+
+    void waitForStep(int stepWaitFor) {
+        pthread_mutex_lock(&ss_mutex);
+        while (stepWaitFor != step) {
+            pthread_cond_wait(&ss_cv, &ss_mutex);
+        }
+        pthread_mutex_unlock(&ss_mutex);
+    }
+
+    CommonData() {}
+};
+
+
+struct TaskData {
+    int beginX, endX;
+    int semId;
+    CommonData *commonData;
+    int getSemId() {
+        semId = commonData->getSemId();
+    }
+    void semAdd(int val) {
+        struct sembuf op;
+        op.sem_num = 0;
+        op.sem_op = val;
+        op.sem_flg = 0;
+        if (semop(semId, &op, 1) != 0) {
+            eprintf("Problem with semaphore adding");
+            exit(-7);
+        }
+    }
+};
+
+void* calculatePart(void* tData_) {
+    TaskData *tData = (TaskData*)tData_;
+    CommonData *cData = tData->commonData;
+    tData->getSemId();
+    int layersCount = cData->layers.size() - 1;
+
+    for (int step = 0; step < cData->moves; step += layersCount) {
+        cData->waitForStep(step);
+
+        //eprintf("Thread cycle start step=%d spos=%d\n", step, tData->beginX);
+
+        int stepLength = min(layersCount, cData->moves - step);
+        for (int subStep = 0; subStep < stepLength; subStep++) {
+            int delta = stepLength - subStep - 1;
+            Field &now = cData->layers[subStep], &next = cData->layers[subStep + 1];
+            for (int i = tData->beginX - delta; i < tData->endX + delta; i++)
+                for (int j = 0; j < now.H; j++)
+                    next.at(i, j) = now.getNext(i, j);
+        }
+
+        //eprintf("Thread cycle finished\n");
+        tData->semAdd(+1);
+    }
+    //eprintf("Thread is finished!");
     pthread_exit(NULL);
 }
 
-Field calculate(Field field_, int moves, int threads_count = 2) {
-    Field now = field_, next = field_;
-
-
-    /* init semaphore*/
-    const int semKey = 1508;
+Field calculate(Field field, int moves, int threads_count = 2, int layers = 3) {
+    CommonData cData;
+    cData.layers = vector<Field>(layers + 1, field);
+    cData.moves = moves;
+    cData.semKey = 1508;
     int semid;
-    if ((semid = semget(semKey, 1, 0666 | IPC_CREAT)) < 0) {
-        eprintf("Problem with creating semaphore");
-        exit(-7);
+    /* init semaphore*/ {
+        if ((semid = semget(cData.semKey, 1, 0666 | IPC_CREAT)) < 0) {
+            eprintf("Problem with creating semaphore");
+            exit(-7);
+        }
+        union semun {
+            int val;
+            struct semid_ds *buf;
+            ushort * array;
+        } argument;
+        argument.val = 0;
+        if (semctl(semid, 0, SETVAL, argument) < 0) {
+            eprintf("Cannot set semaphore value.\n");
+            exit(-7);
+        }
     }
-    union semun {
-		int val;
-		struct semid_ds *buf;
-		ushort * array;
-	} argument;
-    argument.val = 0;
-    if (semctl(semid, 0, SETVAL, argument) < 0) {
-        eprintf("Cannot set semaphore value.\n");
-        exit(-7);
-    }
-
     /* init wait_condition (ss = step start) */
-    pthread_mutex_t ss_mutex;
-    pthread_cond_t ss_cv;
-    pthread_mutex_init(&ss_mutex, NULL);
-    pthread_cond_init (&ss_cv, NULL);
+    pthread_mutex_init(&cData.ss_mutex, NULL);
+    pthread_cond_init (&cData.ss_cv, NULL);
 
-    int step = -1;
-    vector<pthread_t> threads(threads_count - 1);
-    vector<TaskData> tDatas(threads_count - 1);
-    int lenPartX = (now.W + threads_count - 1) / threads_count;
+    cData.step = -1;
+    vector<pthread_t> threads(threads_count);
+    vector<TaskData> tDatas(threads_count);
+    int lenPartX = (field.W + threads_count - 1) / threads_count;
     for (size_t i = 0; i < threads.size(); i++) {
-        tDatas[i].now = &now;
-        tDatas[i].next = &next;
         tDatas[i].beginX = i * lenPartX;
-        tDatas[i].endX = min(int(i + 1) * lenPartX, now.W);
-        tDatas[i].semKey = semKey;
-        tDatas[i].ss_mutex = &ss_mutex;
-        tDatas[i].ss_cv = &ss_cv;
-        tDatas[i].step = &step;
-        tDatas[i].moves = moves;
+        tDatas[i].endX = min(tDatas[i].beginX + lenPartX, field.W);
+        tDatas[i].commonData = &cData;
         if (pthread_create(&threads[i], NULL, calculatePart, &tDatas[i])) {
             eprintf("Problem with creating thread");
             exit(-7);
         }
     }
 
-    for (step = 0; step < moves; step++) {
-        pthread_cond_broadcast(&ss_cv);
-
-        for (int i = lenPartX * (threads_count - 1); i < now.W; i++)
-            for (int j = 0; j < now.H; j++)
-                next.at(i, j) = now.getNext(i, j);
-
-        struct sembuf op;
-        op.sem_num = 0;
-        op.sem_op = -threads.size();
-        op.sem_flg = 0;
-        if (semop(semid, &op, 1) != 0) {
-            eprintf("Problem with semaphore adding");
-            exit(-7);
-        }
-        swap(now, next);
+    for (cData.step = 0; cData.step < moves; cData.step += layers) {
+        /* start to work */
+        //eprintf("Main cycle start step = %d/%d\n", cData.step, cData.moves);
+        pthread_cond_broadcast(&cData.ss_cv);
+        /* wait for finish */
+        cData.semAdd(semid, -threads.size());
+        //eprintf("Main cycle finished\n");
+        int stepLength = min(layers, cData.moves - cData.step);
+        swap(cData.layers.front(), cData.layers[stepLength]);
     }
-
 
     for (size_t i = 0; i < threads.size(); i++) {
         pthread_join(threads[i], NULL);
     }
-    if (semctl(semid, 0, IPC_RMID, argument) < 0) {
+    if (semctl(semid, 0, IPC_RMID) < 0) {
         eprintf("Cannot delete semaphore value.\n");
         exit(-7);
     }
-    pthread_mutex_destroy(&ss_mutex);
-    pthread_cond_destroy(&ss_cv);
-    return now;
+    pthread_mutex_destroy(&cData.ss_mutex);
+    pthread_cond_destroy(&cData.ss_cv);
+    //eprintf("4\n");
+    return cData.layers.front();
 }
 
 Field calculateNaive(Field field, int moves) {
@@ -192,22 +242,21 @@ void test(int W, int H, int moves) {
     Field field(W, H);
     field.randomFill();
     {
-        int t = clock();
+        TimeCounter tc;
         Field ret = calculateNaive(field, moves);
-        t = clock() - t;
-        printf("Time of naive algo: %d, hash: %d\n", t, ret.hashCode());
+        printf("Time of naive algo: %lf, hash: %d\n", tc.durationTicks() / 1e7, ret.hashCode());
     }
+    for (int threads = 2; threads < 5; threads++)
     {
-        int t = clock();
-        Field ret = calculate(field, moves, 2);
-        t = clock() - t;
-        printf("Time of parallel algo: %d, hash: %d\n", t, ret.hashCode());
+        TimeCounter tc;
+        Field ret = calculate(field, moves, threads, 3);
+        printf("Time of parallel algo (%d threads): %lf, hash: %d\n", threads, tc.durationTicks() / 1e7, ret.hashCode());
     }
 }
 
 
 int main()
 {
-    test(10000, 10000, 2);
+    test(1000, 1000, 100);
     return 0;
 }

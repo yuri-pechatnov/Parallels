@@ -1,0 +1,13 @@
+# depslib dependency file v1.0
+1475478509 source:/home/ura/parallels/gamelife/gamelife_socket_tmp/main.cpp
+	<stdio.h>
+	<stdlib.h>
+	<unistd.h>
+	<errno.h>
+	<string.h>
+	<sys/types.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<arpa/inet.h>
+	<netdb.h>
+

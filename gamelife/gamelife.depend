@@ -10,3 +10,14 @@
 	<sys/ipc.h>
 	<sys/sem.h>
 
+1474299695 source:/home/ura/parallels/gamelife/main.cpp
+	<iostream>
+	<cstdio>
+	<vector>
+	<cstdlib>
+	<pthread.h>
+	<stdarg.h>
+	<sys/types.h>
+	<sys/ipc.h>
+	<sys/sem.h>
+

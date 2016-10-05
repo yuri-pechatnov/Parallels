@@ -1,0 +1,66 @@
+# depslib dependency file v1.0
+1475594157 source:/home/ura/parallels/gamelife/gamelife_socket/calc_unit.cpp
+	<stdio.h>
+	<stdlib.h>
+	<unistd.h>
+	<errno.h>
+	<string.h>
+	<sys/types.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<arpa/inet.h>
+	<netdb.h>
+	<cassert>
+	"field.h"
+
+1475478959 source:/home/ura/parallels/gamelife/gamelife_socket/main.cpp
+	<iostream>
+	<cstdio>
+	<vector>
+	<cstdlib>
+	<pthread.h>
+	<stdarg.h>
+	<sys/types.h>
+	<sys/ipc.h>
+	<sys/sem.h>
+	<unistd.h>
+	"field.h"
+	"server.h"
+	"calc_unit.h"
+
+1475594090 source:/home/ura/parallels/gamelife/gamelife_socket/server.cpp
+	<stdio.h>
+	<stdlib.h>
+	<unistd.h>
+	<errno.h>
+	<string.h>
+	<sys/types.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<arpa/inet.h>
+	<cassert>
+	<vector>
+	"field.h"
+
+1475444188 /home/ura/parallels/gamelife/gamelife_socket/field.h
+	<vector>
+	<sys/types.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<arpa/inet.h>
+	<cassert>
+	<vector>
+
+1475445107 /home/ura/parallels/gamelife/gamelife_socket/server.h
+
+1475422164 /home/ura/parallels/gamelife/gamelife_socket/calc_unit.h
+
+1475447292 source:/home/ura/parallels/gamelife/gamelife_socket/field.cpp
+	"field.h"
+	<cstdio>
+	<cstdlib>
+	<stdarg.h>
+	<cassert>
+	<string>
+	<string.h>
+
