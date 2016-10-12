@@ -28,7 +28,7 @@ char eprintf_pref_str[120] = "";
 char eprintf_oneline_buff[4000];
 
 int eprintf(const char *format, ...) {
-    //return 0;
+    return 0;
     va_list args;
     va_start (args, format);
     int ret = vfprintf (stderr, format, args);
@@ -36,7 +36,7 @@ int eprintf(const char *format, ...) {
     return ret;
 }
 int eprintf_pref(const char *format, ...) {
-    //return 0;
+    return 0;
     eprintf_oneline_buff[0] = 0;
     int pos = 0;
     if (eprintf_pref_str != NULL)

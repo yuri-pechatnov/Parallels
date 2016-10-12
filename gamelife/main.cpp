@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
+#include <cassert>
 
 using namespace std;
 
@@ -67,6 +68,24 @@ class Field {
             sum = sum * 17 + matrix[i];
         return sum;
     }
+    void print() {
+		if (H * W > 1000)
+			return;
+		std::string out;
+		for (int i = 0; i < W; i++) {
+			out.push_back(' ');
+			out.push_back(' ');
+			out.push_back(' ');
+			for (int j = 0; j < H; j++)
+				out.push_back(at(i, j) ? 'X' : '*');
+			out.push_back('\n');
+		}
+		//eprintf("normal");
+		//eprintf_set_pref(NULL);
+		assert(out.size() < 12000);
+		eprintf("Field: \n%s", out.c_str());
+	}
+    
     Field(int W, int H): W(W), H(H), matrix(W * H) {}
     Field(): W(0), H(0) {}
 };
@@ -255,8 +274,21 @@ void test(int W, int H, int moves) {
 }
 
 
+void testTower() {
+	Field field(100, 100);
+    field.randomFill();
+    FILE *csv = fopen("b.csv", "wt");
+    for (int la = 1; la < 20; la++) {
+        TimeCounter tc;
+        Field ret = calculate(field, 1000, 4, la);
+        fprintf(csv, "(%d, %lf), ", la, tc.durationTicks() / 1e7);
+        printf("Time of parallel algo (4 threads): %lf, hash: %d\n", tc.durationTicks() / 1e7, ret.hashCode());
+	}
+}
+
 int main()
 {
-    test(1000, 1000, 100);
+	testTower();
+    //test(1000, 1000, 100);
     return 0;
 }

@@ -17,9 +17,9 @@ using namespace std;
 
 
 
-Field calculate(Field field, int moves) {
+Field calculate(Field field, int moves, int proc) {
     int server_port = 49500;
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < proc; i++) {
         int pid = fork();
         if (pid < 0) {
             eprintf("Can't fork() =(");
@@ -47,17 +47,17 @@ Field calculateNaive(Field field, int moves) {
 }
 
 
-void test(int W, int H, int moves) {
+void test(int W, int H, int moves, int minproc, int maxproc) {
     Field field(W, H);
     field.randomFill();
 
     field.print();
 
 
-
+    for (int proc = minproc; proc <= maxproc; proc++)
     {
         TimeCounter tc;
-        Field ret = calculate(field, moves);
+        Field ret = calculate(field, moves, proc);
         eprintf("another ANS:\n");
         fflush(stderr);
         ret.print();
@@ -78,7 +78,8 @@ void test(int W, int H, int moves) {
 
 int main()
 {
-    srand(3);
-    test(40, 40, 10);
+    srand(389);
+    //test(40, 40, 20, 5, 5);
+    test(1000, 1000, 200, 2, 6);
     return 0;
 }
